@@ -13,6 +13,9 @@ const fetcher = (url) => {
 const UploadForm = () => {
   const [isUploading, setIsUploading] = useState(false)
   const [isPreparing, setIsPreparing] = useState(false)
+  const [isRecording, setRecording] = useState(false)
+  const [recorder, setRecorder] = useState(null)
+  const [buttonText, setButtonText] = useState("Record from the browser")
   const [uploadId, setUploadId] = useState(null)
   const [progress, setProgress] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
@@ -54,11 +57,15 @@ const UploadForm = () => {
     }
   }
 
-  const startUpload = (evt) => {
+  const startUploadFromForm = () => {
+    startUpload(inputRef.current.files[0])
+  }
+
+  const startUpload = (file) => {
     setIsUploading(true)
     const upload = UpChunk.createUpload({
       endpoint: createUpload,
-      file: inputRef.current.files[0],
+      file: file,
     })
 
     upload.on('error', (err) => {
@@ -66,13 +73,61 @@ const UploadForm = () => {
     })
 
     upload.on('progress', (progress) => {
-      setProgress(progress.detail)
+      setProgress(Math.floor(progress.detail))
     })
 
     upload.on('success', () => {
       setIsPreparing(true)
     })
   }
+
+  const recordMedia = () => {
+    if (recorder !== null && recorder.state === 'recording')  {
+      console.log("stopping")
+      recorder.stop()
+      return
+    }
+    if (recorder !== null) {
+      console.log(recorder.state)
+      return
+    }
+    if (navigator.mediaDevices) {
+      console.log("getUserMedia supported.")
+      var constraints = { video: true, audio: true }
+      const preferredOptions = { mimeType: "video/webm;codecs=vp9" }
+      const backupOptions = { mimeType: "video/webm;codecs=vp8,opus" }
+      var options = preferredOptions;
+      if (!MediaRecorder.isTypeSupported(preferredOptions.mimeType)) {
+          console.log("using backup options")
+          options = backupOptions
+      }
+      var chunks = []
+      navigator.mediaDevices
+          .getUserMedia(constraints)
+          .then(function(stream) {
+              var mediaRecorder = new MediaRecorder(stream, options)
+              setRecorder(mediaRecorder)
+              mediaRecorder.start()
+              setButtonText("Stop Recording")
+              console.log(mediaRecorder.state)
+              mediaRecorder.onstop = function(e) {
+                  var blob = new Blob(chunks, { type: "video/webm" })
+                  chunks = []
+                  const file = new File([blob], "video-from-camera")
+                  startUpload(file)
+              }
+              mediaRecorder.ondataavailable = function(e) {
+                  chunks.push(e.data)
+              }
+          })
+          .catch(function(err) {
+              console.error(err)
+              if (recorder !== null) {
+                  recorder.stop()
+              }
+          })
+    }
+  }  
 
   if (errorMessage) return <ErrorMessage message={errorMessage} />
 
@@ -89,12 +144,28 @@ const UploadForm = () => {
             <Spinner />
           </>
         ) : (
-          <label>
-            <Button type="button" onClick={() => inputRef.current.click()}>
-              Select a video file
-            </Button>
-            <input type="file" onChange={startUpload} ref={inputRef} />
-          </label>
+          <>
+            <div>
+              <label>
+                <Button type="button" onClick={() => inputRef.current.click()}>
+                  Select a video file
+                </Button>
+                <input type="file" onChange={startUploadFromForm} ref={inputRef} />
+              </label>
+            </div>
+            <div>
+              <p>
+                or...
+              </p>
+            </div>
+            <div>
+              <label>
+                <Button type="button" onClick={recordMedia}>
+                  {buttonText}
+                </Button>
+              </label>
+            </div>
+          </>
         )}
       </div>
       <style jsx>{`

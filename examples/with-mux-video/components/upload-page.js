@@ -5,7 +5,7 @@ export default function UploadPage({ children }) {
   return (
     <Layout
       title="Welcome to Mux + Next.js"
-      description="Get started by uploading a video"
+      description="Get started by uploading a video file or recording a video in your browser"
     >
       <div className="wrapper">
         <div className="about-mux">
